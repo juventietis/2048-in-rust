@@ -3,7 +3,6 @@ extern crate rand;
 
 use std::fmt::{self};
 use cursive::Cursive;
-//use cursive::views::TextView;
 use cursive::Printer;
 use cursive::vec::Vec2;
 use cursive::views::{Dialog, LinearLayout, Panel};
@@ -84,9 +83,9 @@ impl BoardView {
 	fn maybe_add_new_cells(&mut self){
 		let chance = thread_rng().gen_range(0, 4);
 		if chance == 0 {
-			let current_num_of_filled = self.board.iter().filter(|x| {
+			let current_num_of_filled = self.board.iter().filter(|&x| {
 				match x {
-					&&Cell::Occupied(_) => {true}
+					&Cell::Occupied(_) => {true}
 					_ => {false}
 				}
 			}).count();
@@ -110,23 +109,6 @@ impl BoardView {
  
 	}
 
-//fn can_move(&mut self, current_poss: usize, direction: MoveDirection) -> bool {
-//	let mut checking_poss = current_poss;
-//	match direction{
-//		MoveDirection::Up => {
-//			loop{
-//				let current_row = current_poss / 10;
-//				if current_row > 0{
-//					checking_poss -= 10;
-//					match self.board[checking_poss] {
-//						Cell::Occupied(_) => ()
-//						Cell::Empty => return true;
-//					}	
-//				}
-//			}
-//		}
-//	}	
-//}
 	fn can_move(&mut self) -> bool{
 		for cell in self.board.iter(){
 			match cell {
