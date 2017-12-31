@@ -1,0 +1,8 @@
+[package]
+name = "game_2048"
+version = "0.1.0"
+authors = ["mantas"]
+
+[dependencies]
+cursive = "0.7"
+rand = "*"
