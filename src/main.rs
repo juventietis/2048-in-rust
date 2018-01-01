@@ -91,13 +91,8 @@ impl BoardView {
 	fn maybe_add_new_cells(&mut self){
 		let chance = thread_rng().gen_range(0, 4);
 		if chance == 0 {
-			let current_num_of_filled = self.board.iter().filter(|&x| {
-				match x {
-					&Cell::Occupied(_) => {true}
-					_ => {false}
-				}
-			}).count();
-			let num_of_free = self.number_of_cells - current_num_of_filled;
+			let current_num_of_filled = self.number_of_filled_cels();
+            let num_of_free = self.number_of_cells - current_num_of_filled;
 			if num_of_free != 0{
 				let cells_to_add = std::cmp::min(num_of_free, MAX_NUMBER_OF_NEW_CELLS_TO_ADD);
 				for _ in 0..cells_to_add{
@@ -116,14 +111,28 @@ impl BoardView {
 		}
  
 	}
+    
+    fn number_of_filled_cels(&mut self) -> usize{
+        self.board.iter().filter(|&x| {
+            match x {
+                &Cell::Occupied(_) => {true}
+                _ => {false}
+            }
+        }).count()
+
+    }
 
 	fn can_move(&mut self) -> bool{
-		for cell in self.board.iter(){
-			match cell {
-				&Cell::Empty => {return true;}
-				_ => ()
-			}
-		}
+        if self.number_of_filled_cels() < self.number_of_cells{
+            return true;
+        } else {
+            for cell in self.board.iter(){
+                match cell {
+                    &Cell::Empty => {return true;}
+                    _ => ()
+                }
+            }
+        }
 		return false;
 	}
 
@@ -190,7 +199,23 @@ impl BoardView {
 		}
 	}
 
-	fn move_cells(&mut self, direction: MoveDirection) -> EventResult {
+    fn process_action(&mut self, direction: MoveDirection) -> EventResult {
+        let mut modifications = self.move_cells(direction);
+		self.apply_modifications(&mut modifications, direction);
+		if !self.can_move(){
+			return EventResult::with_cb(|s| {
+                        s.add_layer(Dialog::text("No more moves left!").button("Ok", |s| {
+                            s.pop_layer();
+                            s.pop_layer();
+                        }));
+			})	
+		} else {
+			return EventResult::Consumed(None)
+		}
+    }
+
+
+	fn move_cells(&mut self, direction: MoveDirection) -> Vec<(usize, usize, Cell)> {
 		let mut modifications:Vec<(usize, usize, Cell)> = vec![];
 		for (i, cell) in self.board.iter().enumerate() {
 			match cell {
@@ -225,17 +250,7 @@ impl BoardView {
 				&Cell::Empty => ()
 			}
 		}
-		self.apply_modifications(&mut modifications, direction);
-		if !self.can_move(){
-			return EventResult::with_cb(|s| {
-                        s.add_layer(Dialog::text("No more moves left!").button("Ok", |s| {
-                            s.pop_layer();
-                            s.pop_layer();
-                        }));
-			})	
-		} else {
-			return EventResult::Consumed(None)
-		}
+        modifications
 	}
 }
 
@@ -264,8 +279,6 @@ fn colorise(cell: Cell) -> Color {
 
 
 impl cursive::view::View for BoardView {
-
-
     fn draw(&self, printer: &Printer){
         for (i, cell) in self.board.iter().enumerate() {
             let x = (i % self.size.x) * 4;
@@ -292,16 +305,16 @@ impl cursive::view::View for BoardView {
     fn on_event(&mut self, event: Event) -> EventResult {
 		match event {
 			Event::Char{0: 'd'} | Event::Key(Key::Right) => {
-				self.move_cells(MoveDirection::Right)
+				self.process_action(MoveDirection::Right)
 			}
 			Event::Char {0: 'a'} | Event::Key(Key::Left) => {
-				self.move_cells(MoveDirection::Left)
+				self.process_action(MoveDirection::Left)
 			}
 			Event::Char{0: 'w'} | Event::Key(Key::Up) => {
-				self.move_cells(MoveDirection::Up)
+				self.process_action(MoveDirection::Up)
 			}
 			Event::Char{0: 's'} | Event::Key(Key::Down) => {
-				self.move_cells(MoveDirection::Down)
+				self.process_action(MoveDirection::Down)
 			}
 			_ => EventResult::Ignored
 		}
