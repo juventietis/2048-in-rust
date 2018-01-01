@@ -6,7 +6,10 @@ extern crate serde_json;
 
 extern crate cursive;
 extern crate rand;
-
+extern crate fern;
+extern crate chrono;
+#[macro_use]
+extern crate log;
 
 use std::fmt::{self};
 use cursive::Cursive;
@@ -21,8 +24,21 @@ use std::fs::File;
 use std::path::Path;
 use std::error::Error;
 use std::io::{Read, Write};
+use std::cmp::Ordering;
 
 fn main() {
+	fern::Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "{}[{}][{}] {}",
+                chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
+                record.target(),
+                record.level(),
+                message
+            ))
+        })
+	.chain(fern::log_file("program.log").expect("Error setting up logs")).apply().expect("Error setting up logs");
+
 	let mut siv = Cursive::new();
 
 	siv.add_global_callback('q', |s| s.quit());
@@ -51,10 +67,29 @@ Quit game: q"))
 }
 
 
-#[derive(Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Serialize, Deserialize, Eq, PartialOrd)]
 enum Cell {
     Occupied(usize),
     Empty,
+}
+
+impl Ord for Cell{
+	fn cmp(&self, other: &Cell) -> Ordering{
+		match self{
+			&Cell::Occupied(n) => {
+				match other {
+					&Cell::Occupied(m) => n.cmp(&m),
+					&Cell::Empty => Ordering::Greater,
+				}
+			}
+			&Cell::Empty => { 
+				match other {
+					&Cell::Occupied(_) => Ordering::Less,
+					&Cell::Empty => Ordering::Equal,
+				}
+			}
+		}
+	}
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -248,7 +283,7 @@ impl BoardView {
     fn process_action(&mut self, direction: MoveDirection) -> EventResult {
 		self.save_previous_board();
         let mut modifications = self.move_cells(direction);
-        let current_board = self.board.to_vec();
+        let current_board = self.board.clone();
 		let (updated_board, applied_modifications) = self.apply_modifications(current_board, &mut modifications, direction);
         self.board = updated_board;
 		if applied_modifications != 0{
@@ -364,6 +399,19 @@ impl cursive::view::View for BoardView {
     }
 
     fn required_size(&mut self, _: Vec2) -> Vec2 {
+		let mut max_so_far = 0;
+		for cell in self.board.iter(){
+			match cell {
+				&Cell::Occupied(n) => {
+					if n > max_so_far{
+						max_so_far = n;
+					}
+				}
+				&Cell::Empty => ()
+			}
+		}
+		let str_val: String = max_so_far.to_string();
+		info!("Max so far {}", max_so_far);
         self.size.map_x(|x| 4*x)
     }
 
