@@ -55,13 +55,16 @@ struct BoardView {
 	number_of_cells: usize,
 	size_x: usize,
 	size_y: usize,
+    has_won: bool,
 }
 
 const SIZE_X : usize = 6;
 const SIZE_Y : usize = 6;
 const STARTING_CELL_NUMBER: usize = 2;
+const WINNING_CELL_NUMBER: usize = 2048;
 const MAX_NUMBER_OF_NEW_CELLS_TO_ADD : usize = 2;
 const NUMBER_OF_FILLED_CELL_AT_START: usize = 4;
+const CHANCE_OF_ADDING_CELLS: usize = 4; // Chance is calculated as 1/CHANCE_OF_ADDING_CELLS.
 
 impl BoardView {
     pub fn new() -> Self{
@@ -70,12 +73,14 @@ impl BoardView {
         let size = Vec2::new(SIZE_X, SIZE_Y);
 		let size_x = SIZE_X;
 		let size_y = SIZE_Y;
+        let has_won = false;
         let mut board_view = BoardView {
             board,
             size,
 		    number_of_cells,
 		    size_x,
 			size_y,
+            has_won,
         };
         board_view.set_up_board();
         board_view
@@ -89,7 +94,7 @@ impl BoardView {
     }
 	
 	fn maybe_add_new_cells(&mut self){
-		let chance = thread_rng().gen_range(0, 4);
+		let chance = thread_rng().gen_range(0, CHANCE_OF_ADDING_CELLS);
 		if chance == 0 {
 			let current_num_of_filled = self.number_of_filled_cels();
             let num_of_free = self.number_of_cells - current_num_of_filled;
@@ -172,6 +177,13 @@ impl BoardView {
 		}
 	}
 
+    fn check_if_won(&mut self) -> bool {
+        self.board.iter().find(|&cell| match *cell {
+            Cell::Occupied(WINNING_CELL_NUMBER) => true,
+            _ => false,
+        }).is_some()
+    }
+
 	fn apply_modifications(&mut self, mut board: Vec<Cell>, mut modifications: &mut Vec<(usize, usize, Cell)>, direction: MoveDirection) -> (Vec<Cell>, usize) {
 		let mut applied_modifications = 0;
 		self.sort_modifications(&mut modifications, direction);	
@@ -208,11 +220,20 @@ impl BoardView {
 		if applied_modifications != 0{
 			self.maybe_add_new_cells();
 		}
+        if !self.has_won && self.check_if_won(){
+            self.has_won = true; 
+			return EventResult::with_cb(|s| {
+                        s.add_layer(Dialog::text("You have won!")
+                            .button("Continue", |s| {s.pop_layer();})
+                            .button("Quit", |s| {s.quit();})
+                        );
+			})	
+        }
+        
 		if !self.can_move(){
 			return EventResult::with_cb(|s| {
-                        s.add_layer(Dialog::text("No more moves left!").button("Ok", |s| {
-                            s.pop_layer();
-                            s.pop_layer();
+                        s.add_layer(Dialog::text("No more moves left!").button("Quit", |s| {
+                            s.quit();
                         }));
 			})	
 		} else {
