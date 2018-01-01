@@ -254,7 +254,7 @@ impl BoardView {
 		for &(prev_i, i, cell) in modifications.iter(){
 			match cell {
 				Cell::Occupied(new_val) => {
-					let current_cell = self.board[i];
+					let current_cell = board[i];
 					match current_cell {
 						Cell::Occupied(val) => {
 							if val == new_val {
