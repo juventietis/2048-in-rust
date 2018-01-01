@@ -50,7 +50,8 @@ fn main() {
                   .content(
                       LinearLayout::vertical()
                         .child(Panel::new(board_view))
-						.child(TextView::new("Control with arrows
+						.child(TextView::new("
+Control with arrows
 Undo move: u
 Save game: k
 Load game: l
@@ -381,11 +382,27 @@ fn colorise(cell: Cell) -> Color {
     color
 }
 
+fn required_x_padding(board: &Vec<Cell>)-> usize {
+	let mut max_so_far = 0;
+	for cell in board.iter(){
+		match cell {
+			&Cell::Occupied(n) => {
+				if n > max_so_far{
+					max_so_far = n;
+				}
+			}
+			&Cell::Empty => ()
+		}
+	}
+	let str_val: String = max_so_far.to_string();
+	std::cmp::max(str_val.len(), 2) + 1
+}
 
 impl cursive::view::View for BoardView {
     fn draw(&self, printer: &Printer){
+		let padding_x = required_x_padding(&self.board);
         for (i, cell) in self.board.iter().enumerate() {
-            let x = (i % self.size_x) * 4;
+            let x = (i % self.size_x) * padding_x;
             let y = i / self.size_y;
             let color = colorise(*cell);
             printer.with_color(
@@ -399,20 +416,8 @@ impl cursive::view::View for BoardView {
     }
 
     fn required_size(&mut self, _: Vec2) -> Vec2 {
-		let mut max_so_far = 0;
-		for cell in self.board.iter(){
-			match cell {
-				&Cell::Occupied(n) => {
-					if n > max_so_far{
-						max_so_far = n;
-					}
-				}
-				&Cell::Empty => ()
-			}
-		}
-		let str_val: String = max_so_far.to_string();
-		info!("Max so far {}", max_so_far);
-        self.size.map_x(|x| 4*x)
+		let padding_x = required_x_padding(&self.board);
+        self.size.map_x(|x| padding_x*x)
     }
 
     fn take_focus(&mut self, _: Direction) -> bool {
