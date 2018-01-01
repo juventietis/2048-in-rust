@@ -126,11 +126,14 @@ impl BoardView {
         if self.number_of_filled_cels() < self.number_of_cells{
             return true;
         } else {
-            for cell in self.board.iter(){
-                match cell {
-                    &Cell::Empty => {return true;}
-                    _ => ()
+            for direction in [MoveDirection::Down, MoveDirection::Up, MoveDirection::Left, MoveDirection::Right].iter(){
+                let mut modifications = self.move_cells(*direction);
+                let current_board = self.board.to_vec();
+                let (_, applied_modifications) = self.apply_modifications(current_board, &mut modifications, *direction);
+                if applied_modifications != 0{
+                    return true;
                 }
+
             }
         }
 		return false;
@@ -169,7 +172,7 @@ impl BoardView {
 		}
 	}
 
-	fn apply_modifications(&mut self, mut modifications: &mut Vec<(usize, usize, Cell)>, direction: MoveDirection) {
+	fn apply_modifications(&mut self, mut board: Vec<Cell>, mut modifications: &mut Vec<(usize, usize, Cell)>, direction: MoveDirection) -> (Vec<Cell>, usize) {
 		let mut applied_modifications = 0;
 		self.sort_modifications(&mut modifications, direction);	
 		for &(prev_i, i, cell) in modifications.iter(){
@@ -179,14 +182,14 @@ impl BoardView {
 					match current_cell {
 						Cell::Occupied(val) => {
 							if val == new_val {
-								self.board[i] = Cell::Occupied(new_val + val);
-								self.board[prev_i] = Cell::Empty;
+								board[i] = Cell::Occupied(new_val + val);
+								board[prev_i] = Cell::Empty;
 								applied_modifications += 1;
 							}
 						}
 						Cell::Empty => {
-							self.board[i] = cell;
-							self.board[prev_i] = Cell::Empty;
+							board[i] = cell;
+							board[prev_i] = Cell::Empty;
 							applied_modifications += 1;
 						}
 					}
@@ -194,14 +197,17 @@ impl BoardView {
 				Cell::Empty => ()
 			}
 		}
-		if applied_modifications != 0{
-			self.maybe_add_new_cells();
-		}
+        (board, applied_modifications)
 	}
 
     fn process_action(&mut self, direction: MoveDirection) -> EventResult {
         let mut modifications = self.move_cells(direction);
-		self.apply_modifications(&mut modifications, direction);
+        let current_board = self.board.to_vec();
+		let (updated_board, applied_modifications) = self.apply_modifications(current_board, &mut modifications, direction);
+        self.board = updated_board;
+		if applied_modifications != 0{
+			self.maybe_add_new_cells();
+		}
 		if !self.can_move(){
 			return EventResult::with_cb(|s| {
                         s.add_layer(Dialog::text("No more moves left!").button("Ok", |s| {
