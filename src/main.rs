@@ -12,7 +12,7 @@ use std::fmt::{self};
 use cursive::Cursive;
 use cursive::Printer;
 use cursive::vec::Vec2;
-use cursive::views::{Dialog, LinearLayout, Panel};
+use cursive::views::{Dialog, LinearLayout, Panel, TextView};
 use cursive::event::{Event, EventResult, Key};
 use cursive::direction::Direction;
 use cursive::theme::{BaseColor, Color, ColorStyle};
@@ -32,8 +32,13 @@ fn main() {
     siv.add_layer(Dialog::new()
 				  .title("2048")
                   .content(
-                      LinearLayout::horizontal()
+                      LinearLayout::vertical()
                         .child(Panel::new(board_view))
+						.child(TextView::new("Control with arrows
+Undo move: u
+Save game: k
+Load game: l
+Quit game: q"))
                   )
                  //.button("Save game", move |s| {serialize_board(&board_view.board); 
                  //      s.add_layer(Dialog::text("You have won!")
@@ -77,6 +82,7 @@ struct BoardView {
 	size_x: usize,
 	size_y: usize,
     has_won: bool,
+	previous_boards: Vec<Vec<Cell>>,
 }
 
 const SIZE_X : usize = 6;
@@ -95,6 +101,7 @@ impl BoardView {
 		let size_x = SIZE_X;
 		let size_y = SIZE_Y;
         let has_won = false;
+		let previous_boards = Vec::new();
         let mut board_view = BoardView {
             board,
             size,
@@ -102,6 +109,7 @@ impl BoardView {
 		    size_x,
 			size_y,
             has_won,
+			previous_boards,
         };
         board_view.set_up_board();
         board_view
@@ -233,7 +241,12 @@ impl BoardView {
         (board, applied_modifications)
 	}
 
+	fn save_previous_board(&mut self) {
+		self.previous_boards.push(self.board.clone());
+	}
+
     fn process_action(&mut self, direction: MoveDirection) -> EventResult {
+		self.save_previous_board();
         let mut modifications = self.move_cells(direction);
         let current_board = self.board.to_vec();
 		let (updated_board, applied_modifications) = self.apply_modifications(current_board, &mut modifications, direction);
@@ -261,6 +274,14 @@ impl BoardView {
 			return EventResult::Consumed(None)
 		}
     }
+
+	fn undo_move(&mut self){
+		let previous_board = self.previous_boards.pop();
+		if previous_board.is_some(){
+			self.board = previous_board.unwrap();
+		}
+		
+	}
 
 
 	fn move_cells(&mut self, direction: MoveDirection) -> Vec<(usize, usize, Cell)> {
@@ -380,6 +401,10 @@ impl cursive::view::View for BoardView {
                             s.pop_layer();
                         }))
                 })
+            }
+            Event::Char{0: 'u'} => {
+				self.undo_move();
+				EventResult::Consumed(None)
             }
 			_ => EventResult::Ignored
 		}
