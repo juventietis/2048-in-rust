@@ -10,5 +10,6 @@ Cargo.lock
 **/*.rs.bk
 **/*.rs.rustfmt
 **/*.rs.swp
+**/*.rs.swo
 
 main

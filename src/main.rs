@@ -8,7 +8,7 @@ use cursive::vec::Vec2;
 use cursive::views::{Dialog, LinearLayout, Panel};
 use cursive::event::{Event, EventResult, Key};
 use cursive::direction::Direction;
-
+use cursive::theme::{BaseColor, Color, ColorStyle};
 use rand::{Rng, thread_rng};
 
 fn main() {
@@ -59,25 +59,33 @@ struct BoardView {
 
 const SIZE_X : usize = 6;
 const SIZE_Y : usize = 6;
+const STARTING_CELL_NUMBER: usize = 2;
+const MAX_NUMBER_OF_NEW_CELLS_TO_ADD : usize = 2;
+const NUMBER_OF_FILLED_CELL_AT_START: usize = 4;
 
 impl BoardView {
     pub fn new() -> Self{
 		let number_of_cells = SIZE_X * SIZE_Y;
-        let mut board = vec![Cell::Empty; number_of_cells];
-		for _ in 0..4{
-			let cell: usize = thread_rng().gen_range(0, number_of_cells);
-			board[cell] = Cell::Occupied(2);
-		}
+        let board = vec![Cell::Empty; number_of_cells];
         let size = Vec2::new(SIZE_X, SIZE_Y);
 		let size_x = SIZE_X;
 		let size_y = SIZE_Y;
-        BoardView {
+        let mut board_view = BoardView {
             board,
             size,
 		    number_of_cells,
 		    size_x,
 			size_y,
-        }
+        };
+        board_view.set_up_board();
+        board_view
+    }
+
+    fn set_up_board(&mut self){
+		for _ in 0..NUMBER_OF_FILLED_CELL_AT_START{
+			let cell: usize = thread_rng().gen_range(0, self.number_of_cells);
+			self.board[cell] = Cell::Occupied(STARTING_CELL_NUMBER);
+		}
     }
 	
 	fn maybe_add_new_cells(&mut self){
@@ -91,13 +99,13 @@ impl BoardView {
 			}).count();
 			let num_of_free = self.number_of_cells - current_num_of_filled;
 			if num_of_free != 0{
-				let cells_to_add = std::cmp::min(num_of_free, 2);
+				let cells_to_add = std::cmp::min(num_of_free, MAX_NUMBER_OF_NEW_CELLS_TO_ADD);
 				for _ in 0..cells_to_add{
 					loop{
 						let cell: usize = thread_rng().gen_range(0, self.number_of_cells);
 						match self.board[cell] {
 							Cell::Empty => {
-								self.board[cell] = Cell::Occupied(2);
+								self.board[cell] = Cell::Occupied(STARTING_CELL_NUMBER);
 								break;
 							}
 							Cell::Occupied(_) => ()
@@ -231,13 +239,45 @@ impl BoardView {
 	}
 }
 
+fn colorise(cell: Cell) -> Color {
+    let color = match cell {
+        Cell::Occupied(2) => Color::Dark(BaseColor::White),
+        Cell::Occupied(4) => Color::Dark(BaseColor::Yellow),
+        Cell::Occupied(8) => Color::Dark(BaseColor::Green),
+        Cell::Occupied(16) => Color::Dark(BaseColor::Cyan),
+        Cell::Occupied(32) => Color::Dark(BaseColor::Blue),
+        Cell::Occupied(64) => Color::Dark(BaseColor::Magenta),
+        Cell::Occupied(128) => Color::Dark(BaseColor::Red),
+        Cell::Occupied(256) => Color::Light(BaseColor::Yellow),
+        Cell::Occupied(512) => Color::Rgb(0,153,0),
+        Cell::Occupied(1024) => Color::Light(BaseColor::Cyan),
+        Cell::Occupied(2048) => Color::Light(BaseColor::Blue),
+        Cell::Occupied(4096) => Color::Light(BaseColor::Magenta),
+        Cell::Occupied(8192) => Color::Light(BaseColor::Red),
+        Cell::Occupied(_) => {
+            Color::Rgb(255,0,0)
+        }
+        Cell::Empty => Color::Dark(BaseColor::White),
+    };
+    color
+}
+
 
 impl cursive::view::View for BoardView {
+
+
     fn draw(&self, printer: &Printer){
         for (i, cell) in self.board.iter().enumerate() {
             let x = (i % self.size.x) * 4;
             let y = i / self.size.y;
-            printer.print((x, y), &cell.to_string());
+            let color = colorise(*cell);
+            printer.with_color(
+                ColorStyle::Custom {
+                    back: color,
+                    front: Color::Dark(BaseColor::Black),
+                },
+                |printer| printer.print((x, y), &cell.to_string()),
+            )
         }
     }
 
