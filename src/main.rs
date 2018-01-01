@@ -1,5 +1,12 @@
+#[macro_use]
+extern crate serde_derive;
+
+extern crate serde;
+extern crate serde_json;
+
 extern crate cursive;
 extern crate rand;
+
 
 use std::fmt::{self};
 use cursive::Cursive;
@@ -10,23 +17,36 @@ use cursive::event::{Event, EventResult, Key};
 use cursive::direction::Direction;
 use cursive::theme::{BaseColor, Color, ColorStyle};
 use rand::{Rng, thread_rng};
+use std::fs::File;
+use std::path::Path;
+use std::error::Error;
+use std::io::{Read, Write};
 
 fn main() {
 	let mut siv = Cursive::new();
 
 	siv.add_global_callback('q', |s| s.quit());
 
+    let board_view = BoardView::new();
+
     siv.add_layer(Dialog::new()
 				  .title("2048")
                   .content(
                       LinearLayout::horizontal()
-                        .child(Panel::new(BoardView::new()))
-                  ));
+                        .child(Panel::new(board_view))
+                  )
+                 //.button("Save game", move |s| {serialize_board(&board_view.board); 
+                 //      s.add_layer(Dialog::text("You have won!")
+                 //          .button("Continue", |s| {s.pop_layer();}))
+                 //  })
+                  .button("Quit", |s| s.quit())
+                  );
 
 	siv.run();
 }
 
-#[derive(Clone, Copy, PartialEq)]
+
+#[derive(Clone, Copy, PartialEq, Serialize, Deserialize)]
 enum Cell {
     Occupied(usize),
     Empty,
@@ -49,6 +69,7 @@ impl fmt::Display for Cell {
     }
 }
 
+#[derive(Clone, PartialEq)]
 struct BoardView { 
     board: Vec<Cell>,
     size: Vec2,
@@ -308,8 +329,8 @@ fn colorise(cell: Cell) -> Color {
 impl cursive::view::View for BoardView {
     fn draw(&self, printer: &Printer){
         for (i, cell) in self.board.iter().enumerate() {
-            let x = (i % self.size.x) * 4;
-            let y = i / self.size.y;
+            let x = (i % self.size_x) * 4;
+            let y = i / self.size_y;
             let color = colorise(*cell);
             printer.with_color(
                 ColorStyle::Custom {
@@ -343,7 +364,68 @@ impl cursive::view::View for BoardView {
 			Event::Char{0: 's'} | Event::Key(Key::Down) => {
 				self.process_action(MoveDirection::Down)
 			}
+            Event::Char{0: 'k'} => {
+                save_game(&self.board);
+                EventResult::with_cb(|s| {
+                        s.add_layer(Dialog::text("Game saved!").button("Continue", |s| {
+                            s.pop_layer();
+                        }))
+                })
+            }
+            Event::Char{0: 'l'} => {
+                let board = load_game();
+				self.board = board;
+                EventResult::with_cb(|s| {
+                        s.add_layer(Dialog::text("Game loaded!").button("Continue", |s| {
+                            s.pop_layer();
+                        }))
+                })
+            }
 			_ => EventResult::Ignored
 		}
 	}
+}
+
+fn serialize_board(board: &Vec<Cell>) -> String{
+    serde_json::to_string_pretty(&board).unwrap()
+}
+
+fn save_game(board: &Vec<Cell>) {
+    let serialized = serialize_board(&board);
+    let path = Path::new("save_game.json");
+    let display = path.display();
+    let mut file: File = match File::create(&path) {
+        Err(why) => panic!("couldn't create {}: {}", display, why.description()),
+        Ok(file) => file,
+    };
+	match file.write_all(serialized.as_bytes()) {
+		Err(why) => {
+			panic!("couldn't write to {}: {}", display,
+											   why.description())
+		},
+		Ok(_) => println!("successfully wrote to {}", display),
+	}
+}
+
+fn deserialize_board(serialized_board: String) -> Vec<Cell> {
+	serde_json::from_str(&serialized_board).unwrap()
+}
+
+fn load_game() -> Vec<Cell>{
+    let path = Path::new("save_game.json");
+    let display = path.display();
+    let mut file: File = match File::open(&path) {
+        Err(why) => panic!("couldn't open {}: {}", display, why.description()),
+        Ok(file) => file,
+    };
+	let mut serialized_board = String::new();
+	match file.read_to_string(&mut serialized_board) {
+		Err(why) => {
+			panic!("couldn't read from {}: {}", display,
+											   why.description())
+		},
+		Ok(_) => println!("successfully read from {}", display),
+	}
+	let board = deserialize_board(serialized_board);
+	board	
 }
